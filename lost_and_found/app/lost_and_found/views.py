@@ -5,7 +5,6 @@ from urllib.parse import quote
 from ..wx import wx_models
 from app import config, db
 import ast
-from app import redis_store
 
 
 @lost_and_found.route('/index', methods=('GET', 'POST'))
@@ -16,17 +15,16 @@ def index():
         nickname = request.args.get('nicknama')
         sex = request.args.get('nickname')
         url = quote(request.url)
-
         if code:
-            if redis_store.exists(code):
-                openid = redis_store.mget(code)
-            else:
-                url = wx_models.get_wx_permission(code)
-                return redirect(url % ('index'))
+            url = wx_models.get_wx_permission(code)
+            return redirect(url % ('index'))
+        if openid is None:
+            return redirect(
+        config.DevConfig.CODE_URL %
+        (config.DevConfig.appID, url, 'snsapi_userinfo', 'STATE'))
 
         if openid:
             info = LostAndFound.get_main_list(LostAndFoundState.NORMAL, 30)
-            info = reversed(info)
             return render_template('index.html',
                                    openid=openid,
                                    nickname=nickname,
@@ -34,17 +32,8 @@ def index():
                                    appid=config.DevConfig.appID,
                                    info=info)
 
-        if openid is None:
-            return redirect(
-        config.DevConfig.CODE_URL %
-        (config.DevConfig.appID, url, 'snsapi_userinfo', 'STATE'))
-
-
     if request.method == 'POST':
         data = request.form.get('value')
-        data = ast.literal_eval(data)
-        id = data['id']
-        user_id = ['user_id']
         if bool(data['state']):
             return
         else:
@@ -107,21 +96,16 @@ def admin():
             info = LostAndFound.query.filter_by(state=0).all()
             return render_template('admin.html', info=info, openid=openid)
         if code:
-            if redis_store.exists(code):
-                openid = redis_store.mget(code)
-            else:
-                url = wx_models.get_wx_permission(code)
-                return redirect(url % ('admin'))
-
+            url = wx_models.get_wx_permission(code)
+            return redirect(url % ('admin'))
 
         if openid is None:
             return redirect(
         config.DevConfig.CODE_URL %
         (config.DevConfig.appID, url, 'snsapi_userinfo', 'STATE'))
 
-        if openid and Admin.query.filter_by(user_id=openid).first():
+        if Admin.query.filter_by(user_id=openid).first():
             info = LostAndFound.query.filter_by(state=0).all()
-            info = reversed(info)
             return render_template('admin.html', info=info, openid=openid, appid=appid)
 
         else:
